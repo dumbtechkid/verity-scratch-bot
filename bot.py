@@ -25,8 +25,8 @@ load_dotenv()
 SCRATCH_USERNAME   = os.environ.get("SCRATCH_USERNAME", "")
 SCRATCH_PASSWORD   = os.environ.get("SCRATCH_PASSWORD", "")
 SCRATCH_PROJECT_ID = os.environ.get("SCRATCH_PROJECT_ID", "")
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL   = os.environ.get("OPENROUTER_MODEL", "liquid/lfm-2.5-2.6b:free")
+GROQ_API_KEY       = os.environ.get("GROQ_API_KEY", "") or os.environ.get("OPENROUTER_API_KEY", "")
+GROQ_MODEL         = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 PORT               = int(os.environ.get("PORT", 8080))
 
 # Cloud variable names (must exactly match Scratch project)
@@ -118,24 +118,24 @@ def start_health_server(port):
 
 
 # ══════════════════════════════════════════════════════════════════
-# OpenRouter AI Logic
+# Groq AI Logic (14,400 free requests/day)
 # ══════════════════════════════════════════════════════════════════
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-SYSTEM_PROMPT = "act like verity, the minecraft one. and also keep responses STRICTLY within 127 characters"
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+SYSTEM_PROMPT = (
+    "Act like Verity from Minecraft. Answer all questions accurately and helpfully "
+    "(including math, science, and coding) in your fun Minecraft Verity style! "
+    "Keep responses STRICTLY within 127 characters. Do not use newlines."
+)
 chat_history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
 
 def ask_ai(question: str) -> str:
-    """Call OpenRouter with multi-model fallback and auto-pruning."""
+    """Call Groq API with multi-model fallback and auto-pruning."""
     global chat_history
 
-    models_to_try = [OPENROUTER_MODEL]
-    for fallback in [
-        "liquid/lfm-2.5-2.6b:free",
-        "apodex/apodex-1.1-mini:free",
-        "qwen/qwen3.8-27b:free",
-    ]:
+    models_to_try = [GROQ_MODEL]
+    for fallback in ["qwen/qwen3.8-27b", "openai/gpt-oss-20b"]:
         if fallback not in models_to_try:
             models_to_try.append(fallback)
 
@@ -149,25 +149,23 @@ def ask_ai(question: str) -> str:
     for model_name in models_to_try:
         try:
             headers = {
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Authorization": f"Bearer {GROQ_API_KEY}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://scratch.mit.edu",
-                "X-Title": "Scratch Verity AI",
             }
             payload = {
                 "model": model_name,
                 "messages": chat_history,
             }
-            res = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=8)
+            res = requests.post(GROQ_URL, headers=headers, json=payload, timeout=8)
             if res.status_code == 200:
                 data = res.json()
                 answer = data["choices"][0]["message"]["content"].strip()
                 chat_history.append({"role": "assistant", "content": answer})
                 break
             else:
-                log.warning(f"Model {model_name} status {res.status_code}, trying fallback...")
+                log.warning(f"Model {model_name} status {res.status_code}: {res.text}")
         except Exception as e:
-            log.warning(f"Model {model_name} error/timeout ({e}), trying fallback...")
+            log.warning(f"Model {model_name} error ({e}), trying fallback...")
 
     if not answer:
         if chat_history and chat_history[-1]["role"] == "user":
@@ -245,7 +243,7 @@ def run_scratch_loop():
 def main():
     log.info("Starting Verity 24/7 Cloud Service...")
 
-    if not all([SCRATCH_USERNAME, SCRATCH_PASSWORD, SCRATCH_PROJECT_ID, OPENROUTER_API_KEY]):
+    if not all([SCRATCH_USERNAME, SCRATCH_PASSWORD, SCRATCH_PROJECT_ID, GROQ_API_KEY]):
         log.error("Missing required environment variables! Check .env or cloud config.")
         return
 
