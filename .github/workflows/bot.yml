@@ -1,0 +1,42 @@
+name: 24-7 Verity Scratch AI Bot
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run every 5 hours to stay active 24/7
+    - cron: '0 */5 * * *'
+
+concurrency:
+  group: verity-scratch-bot
+  cancel-in-progress: true
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Verity Scratch AI
+        env:
+          SCRATCH_USERNAME: ${{ secrets.SCRATCH_USERNAME }}
+          SCRATCH_PASSWORD: ${{ secrets.SCRATCH_PASSWORD }}
+          SCRATCH_PROJECT_ID: ${{ secrets.SCRATCH_PROJECT_ID }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
+          PORT: 8080
+        run: |
+          python bot.py
