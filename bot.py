@@ -1,15 +1,3 @@
-"""
-Scratch AI Backend — Stage 2 (24/7 Cloud Deployment)
-====================================================
-Designed to run continuously on free cloud hosts (Koyeb, Hugging Face Spaces,
-Render, Railway, Fly.io) with:
-1. Self-healing auto-reconnect loop (never crashes on disconnects).
-2. Embedded lightweight HTTP health check on $PORT (keeps hosting providers happy).
-3. OpenRouter multi-model fallback with fast free models.
-4. Verity Minecraft system prompt with 127-character response limit.
-5. Guaranteed delivery with retry logic for Scratch cloud variables.
-"""
-
 import os
 import time
 import logging
@@ -19,7 +7,6 @@ import requests
 from dotenv import load_dotenv
 import scratchattach as sa
 
-# ── Load environment variables ──────────────────────────────────
 load_dotenv()
 
 SCRATCH_USERNAME   = os.environ.get("SCRATCH_USERNAME", "")
@@ -29,20 +16,17 @@ GROQ_API_KEY       = os.environ.get("GROQ_API_KEY", "") or os.environ.get("OPENR
 GROQ_MODEL         = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 PORT               = int(os.environ.get("PORT", 8080))
 
-# Cloud variable names (must exactly match Scratch project)
 INPUT_VAR  = "INPUT"
 OUTPUT_VAR = "OUTPUT"
 
-# ── Encoding key (identical to generate_scratch.py) ──────────────
 KEY_CHARS = list(
-    "abcdefghijklmnopqrstuvwxyz "   # codes 01-27
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"    # codes 28-53
-    "0123456789"                     # codes 54-63
-    ".,?!:;'\"()-/+=*@#%_&"         # codes 64-83
+    "abcdefghijklmnopqrstuvwxyz "
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "0123456789"
+    ".,?!:;'\"()-/+=*@#%_&"
 )
 MAX_RESPONSE_CHARS = 127
 
-# ── Logging ─────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -50,12 +34,7 @@ logging.basicConfig(
 log = logging.getLogger("VerityCloudBot")
 
 
-# ══════════════════════════════════════════════════════════════════
-# Encoding / Decoding
-# ══════════════════════════════════════════════════════════════════
-
 def encode(text: str) -> str:
-    """Encode text string into numeric cloud-safe string with sentinel '1'."""
     replacements = {
         "’": "'", "‘": "'", "`": "'",
         "“": '"', "”": '"',
@@ -77,7 +56,6 @@ def encode(text: str) -> str:
 
 
 def decode(raw_value) -> str:
-    """Decode numeric string back to plaintext."""
     num_str = str(raw_value).strip()
     if "." in num_str:
         num_str = num_str.split(".")[0]
@@ -96,10 +74,6 @@ def decode(raw_value) -> str:
     return result
 
 
-# ══════════════════════════════════════════════════════════════════
-# Embedded HTTP Health Check Server
-# ══════════════════════════════════════════════════════════════════
-
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -115,7 +89,6 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.wfile.write(html.encode("utf-8"))
 
     def log_message(self, format, *args):
-        # Silence access logs to keep console clean
         return
 
 
@@ -124,10 +97,6 @@ def start_health_server(port):
     log.info(f"Health check HTTP server listening on port {port}.")
     server.serve_forever()
 
-
-# ══════════════════════════════════════════════════════════════════
-# Groq AI Logic (14,400 free requests/day)
-# ══════════════════════════════════════════════════════════════════
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 SYSTEM_PROMPT = (
@@ -142,7 +111,6 @@ chat_history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
 
 def ask_ai(question: str) -> str:
-    """Call Groq API with multi-model fallback and auto-pruning."""
     global chat_history
 
     models_to_try = [GROQ_MODEL]
@@ -150,7 +118,6 @@ def ask_ai(question: str) -> str:
         if fallback not in models_to_try:
             models_to_try.append(fallback)
 
-    # Prune history if it exceeds 10 turns to keep cloud memory clean
     if len(chat_history) > 11:
         chat_history = [chat_history[0]] + chat_history[-10:]
 
@@ -189,12 +156,7 @@ def ask_ai(question: str) -> str:
     return answer
 
 
-# ══════════════════════════════════════════════════════════════════
-# Scratch Cloud Manager (Self-Healing Loop)
-# ══════════════════════════════════════════════════════════════════
-
 def run_scratch_loop():
-    """Runs the Scratch event listener with automatic reconnection on drops."""
     import warnings
     warnings.filterwarnings("ignore", category=sa.LoginDataWarning)
 
@@ -226,7 +188,6 @@ def run_scratch_loop():
 
                 log.info(f"Question: {question!r}")
 
-                # Immediately clear OUTPUT on server so Scratch knows we are thinking
                 try:
                     cloud.set_var(OUTPUT_VAR, "0")
                 except Exception as e:
@@ -257,10 +218,6 @@ def run_scratch_loop():
             time.sleep(10)
 
 
-# ══════════════════════════════════════════════════════════════════
-# Main Entry Point
-# ══════════════════════════════════════════════════════════════════
-
 def main():
     log.info("Starting Verity 24/7 Cloud Service...")
 
@@ -268,11 +225,9 @@ def main():
         log.error("Missing required environment variables! Check .env or cloud config.")
         return
 
-    # Start health check server on background daemon thread
     health_thread = threading.Thread(target=start_health_server, args=(PORT,), daemon=True)
     health_thread.start()
 
-    # Run the self-healing Scratch loop on the main thread
     run_scratch_loop()
 
 
