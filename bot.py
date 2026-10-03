@@ -56,10 +56,18 @@ log = logging.getLogger("VerityCloudBot")
 
 def encode(text: str) -> str:
     """Encode text string into numeric cloud-safe string with sentinel '1'."""
+    replacements = {
+        "’": "'", "‘": "'", "`": "'",
+        "“": '"', "”": '"',
+        "—": "-", "–": "-",
+        "²": "2", "³": "3",
+        "\n": " ", "\r": " ", "\t": " ",
+    }
+    for orig, rep in replacements.items():
+        text = text.replace(orig, rep)
+
     result = "1"
     for ch in text:
-        if ch == "\n":
-            ch = " "
         try:
             idx = KEY_CHARS.index(ch) + 1
             result += str(idx).zfill(2)
@@ -123,9 +131,12 @@ def start_health_server(port):
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 SYSTEM_PROMPT = (
-    "Act like Verity from Minecraft. Answer all questions accurately and helpfully "
-    "(including math, science, and coding) in your fun Minecraft Verity style! "
-    "Keep responses STRICTLY within 127 characters. Do not use newlines."
+    "You are Verity, a friendly, intelligent, and helpful AI assistant. "
+    "Speak naturally, normally, and conversationally. "
+    "Do NOT use weird roleplay, gibberish, exaggerated slang, or repetitive mannerisms. "
+    "Answer questions directly, accurately, and clearly. "
+    "Use only standard plain text (no emojis or unicode symbols). "
+    "Keep every response strictly under 120 characters and do not use newlines."
 )
 chat_history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
