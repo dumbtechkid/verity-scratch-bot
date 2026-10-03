@@ -214,18 +214,28 @@ def run_scratch_loop():
                     return
 
                 log.info(f"Question: {question!r}")
+
+                # Immediately clear OUTPUT on server so Scratch knows we are thinking
+                try:
+                    cloud.set_var(OUTPUT_VAR, "0")
+                except Exception as e:
+                    log.warning(f"Could not reset OUTPUT to 0: {e}")
+
                 answer = ask_ai(question)
                 log.info(f"Answer: {answer!r}")
 
                 encoded = encode(answer)
-                for attempt in range(3):
+                try:
+                    cloud.set_var(OUTPUT_VAR, encoded)
+                    log.info(f"Sent {len(encoded)} digits to ☁ {OUTPUT_VAR}")
+                except Exception as err:
+                    log.warning(f"cloud.set_var error: {err}. Retrying once...")
                     try:
+                        time.sleep(0.3)
                         cloud.set_var(OUTPUT_VAR, encoded)
-                        time.sleep(0.2)
-                    except Exception as err:
-                        log.warning(f"cloud.set_var error (attempt {attempt+1}): {err}")
-                        time.sleep(0.4)
-                log.info(f"Broadcasted {len(encoded)} digits to ☁ {OUTPUT_VAR}")
+                        log.info(f"Retry sent {len(encoded)} digits to ☁ {OUTPUT_VAR}")
+                    except Exception as err2:
+                        log.error(f"Failed to send to cloud var: {err2}")
 
             log.info("Listening for Scratch cloud events...")
             events.start(thread=False)

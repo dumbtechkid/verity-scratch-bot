@@ -2,6 +2,8 @@ name: 24-7 Verity Scratch AI Bot
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
   schedule:
     # Run every 5 hours to stay active 24/7
     - cron: '0 */5 * * *'
